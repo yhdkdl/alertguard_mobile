@@ -10,10 +10,34 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # HTTP requests to Django backend
+  dio: ^5.4.0   
+
+
+# Secure token storage (Keychain on iOS, Keystore on Android)
+  flutter_secure_storage: ^9.0.0
+
+
+  # Navigation
+  go_router: ^13.0.0
+
+
+
+ # State management
+  flutter_riverpod: ^2.5.0
+  riverpod_annotation: ^2.3.0
+
+
+  # UI
+  cupertino_icons: ^1.0.6
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  build_runner: ^2.4.0
+  riverpod_generator: ^2.3.0
 
 flutter:
   uses-material-design: true
