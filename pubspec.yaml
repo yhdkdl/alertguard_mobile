@@ -31,6 +31,22 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.6
 
+# Shake detection
+  sensors_plus: ^4.0.2
+
+  # Volume button detection (works in background)
+  volume_controller: ^2.0.6
+
+  # Keep app alive in background
+  flutter_background_service: ^5.0.5
+
+  # Local notifications (countdown alert, cancel option)
+  flutter_local_notifications: ^17.0.0
+
+  # SharedPreferences for non-sensitive settings (silent mode toggle)
+  shared_preferences: ^2.2.2
+
+
 
 dev_dependencies:
   flutter_test:

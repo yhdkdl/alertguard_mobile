@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
+import 'core/services/background_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Start background service so triggers work when app is minimized
+  await initializeBackgroundService();
+
   runApp(const ProviderScope(child: AlertGuardApp()));
 }
 
