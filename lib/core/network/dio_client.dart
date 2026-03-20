@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import '../storage/secure_storage.dart';
 
 class DioClient {
-  static const String baseUrl = 'http://10.0.2.2:8000/api/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://192.168.1.6:8000/api/v1',
+  );
   // 10.0.2.2 is how Android emulator reaches your Mac/PC localhost
   // For physical device: use your computer's local IP e.g. http://192.168.1.5:8000/api/v1
 
