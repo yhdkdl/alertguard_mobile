@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth_repository.dart';
+import '../../../contacts/presentation/providers/contact_provider.dart';
 
-// The repository provider — single instance shared across the app
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository();
 });
@@ -12,7 +12,6 @@ final authStateProvider = FutureProvider<bool>((ref) async {
   return repo.isLoggedIn();
 });
 
-// Notifier handles register/login/logout actions
 class AuthNotifier extends AsyncNotifier<void> {
   late AuthRepository _repo;
 
@@ -31,9 +30,8 @@ class AuthNotifier extends AsyncNotifier<void> {
       () =>
           _repo.register(email: email, fullName: fullName, password: password),
     );
-    // Tell authStateProvider to re-check storage
     if (!state.hasError) {
-      ref.invalidate(authStateProvider); // ← ADD THIS
+      _invalidateSessionScopedProviders();
     }
   }
 
@@ -42,19 +40,22 @@ class AuthNotifier extends AsyncNotifier<void> {
     state = await AsyncValue.guard(
       () => _repo.login(email: email, password: password),
     );
-    // Tell authStateProvider to re-check storage
     if (!state.hasError) {
-      ref.invalidate(authStateProvider); // ← ADD THIS
+      _invalidateSessionScopedProviders();
     }
   }
 
   Future<void> logout() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.logout());
-    // Force router/auth guards to re-check token storage after logout.
     if (!state.hasError) {
-      ref.invalidate(authStateProvider);
+      _invalidateSessionScopedProviders();
     }
+  }
+
+  void _invalidateSessionScopedProviders() {
+    ref.invalidate(authStateProvider);
+    ref.invalidate(contactsProvider);
   }
 }
 
