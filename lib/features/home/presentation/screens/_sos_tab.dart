@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/services/trigger_service.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
+import '../../../../core/services/permission_service.dart';
 
 class SosTab extends ConsumerStatefulWidget {
   const SosTab({super.key});
@@ -21,7 +22,14 @@ class _SosTabState extends ConsumerState<SosTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPermissions();
+    });
     _initTriggerService();
+  }
+
+  Future<void> _requestPermissions() async {
+    await PermissionService.requestAllPermissions();
   }
 
   void _initTriggerService() {
@@ -40,6 +48,7 @@ class _SosTabState extends ConsumerState<SosTab> {
         if (mounted)
           setState(() {
             _isCounting = false;
+            _countdown = 5;
             _alertSent = true;
           });
         Future.delayed(const Duration(seconds: 3), () {
@@ -47,7 +56,11 @@ class _SosTabState extends ConsumerState<SosTab> {
         });
       },
       onAlertCancelled: () {
-        if (mounted) setState(() => _isCounting = false);
+        if (mounted)
+          setState(() {
+            _isCounting = false;
+            _countdown = 5;
+          });
       },
     );
 
@@ -184,7 +197,7 @@ class _SosTabState extends ConsumerState<SosTab> {
                 Text(
                   _isCounting
                       ? 'Sending alert in $_countdown seconds...'
-                      : 'Press SOS or double-press volume button',
+                      : 'Press SOS or triple-press volume button',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   textAlign: TextAlign.center,
                 ),

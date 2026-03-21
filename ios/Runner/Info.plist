@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>AlertGuard needs your location to include it in SOS alerts</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>AlertGuard needs your location even in background for SOS alerts</string>
+    <key>NSCameraUsageDescription</key>
+    <string>AlertGuard captures photos when SOS is triggered to help identify your situation</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

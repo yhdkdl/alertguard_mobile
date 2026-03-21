@@ -97,7 +97,9 @@ class ContactsScreen extends ConsumerWidget {
     final encodedText = Uri.encodeComponent(message);
     final encodedUrl = Uri.encodeComponent(contact.inviteLink);
 
-    final tgNative = Uri.parse('tg://msg_url?url=$encodedUrl&text=$encodedText');
+    final tgNative = Uri.parse(
+      'tg://msg_url?url=$encodedUrl&text=$encodedText',
+    );
     final tgWeb = Uri.parse(
       'https://t.me/share/url?url=$encodedUrl&text=$encodedText',
     );
@@ -366,4 +368,3 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-

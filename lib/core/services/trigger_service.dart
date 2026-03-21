@@ -167,7 +167,11 @@ class TriggerService {
     final success = await alertServiceInstance.sendAlert(
       triggerType: _triggerTypeToString(type),
     );
-    if (success) onAlertSent?.call();
+    if (success) {
+      onAlertSent?.call();
+    } else {
+      onAlertCancelled?.call();
+    }
   }
 
   Future<void> _vibrateAlert() async {
