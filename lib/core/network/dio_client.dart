@@ -8,6 +8,7 @@ class DioClient {
   );
   // 10.0.2.2 is how Android emulator reaches your Mac/PC localhost
   // For physical device: use your computer's local IP e.g. http://192.168.1.5:8000/api/v1
+  // --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 
   static Dio get instance {
     final dio = Dio(

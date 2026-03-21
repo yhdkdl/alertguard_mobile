@@ -6,8 +6,14 @@ import 'core/services/background_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Start background service so triggers work when app is minimized
-  await initializeBackgroundService();
+  // Start background service so triggers work when app is minimized.
+  // Do not crash app startup if service init fails on a device/config.
+  try {
+    await initializeBackgroundService();
+  } catch (e, st) {
+    debugPrint('Background service init failed: $e');
+    debugPrintStack(stackTrace: st);
+  }
 
   runApp(const ProviderScope(child: AlertGuardApp()));
 }
