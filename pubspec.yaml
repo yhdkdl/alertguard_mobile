@@ -46,8 +46,13 @@ dependencies:
   # SharedPreferences for non-sensitive settings (silent mode toggle)
   shared_preferences: ^2.2.2
 
+  # Open Telegram directly for invite sharing
+  url_launcher: ^6.3.0
 
+ # Native share sheet (WhatsApp, SMS, copy, etc.)
+  share_plus: ^9.0.0
 
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
