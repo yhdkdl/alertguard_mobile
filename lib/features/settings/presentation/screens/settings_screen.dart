@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_provider.dart';
 import '../../../profile/data/profile_model.dart';
 import '../../../profile/data/profile_repository.dart';
-import '../../../../core/storage/secure_storage.dart';
 
 final profileProvider = FutureProvider<ProfileModel>((ref) async {
   return ProfileRepository().getProfile();
@@ -16,14 +14,10 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    SecureStorage.getAccessToken().then((token) {
-      print(
-        '[Debug] Token in storage: ${token != null ? token.substring(0, 20) + "..." : "NULL"}',
-      );
-    });
-
     final silentMode = ref.watch(silentModeProvider);
     final testMode = ref.watch(testModeProvider);
+    final volumeEnabled = ref.watch(volumeTriggerProvider);
+    final shakeEnabled = ref.watch(shakeTriggerProvider);
     final profileState = ref.watch(profileProvider);
 
     return Scaffold(
@@ -32,7 +26,6 @@ class SettingsScreen extends ConsumerWidget {
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
         actions: [
-          // Refresh profile to pick up verification status
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(profileProvider),
@@ -44,7 +37,7 @@ class SettingsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Test Mode Section ──────────────────────────────
+            // ── Test Mode ──────────────────────────────────────
             const _SectionHeader(title: 'Test Mode'),
             Card(
               child: testMode.when(
@@ -74,7 +67,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
 
-            // Active test mode warning banner
+            // Active test mode warning
             testMode.maybeWhen(
               data: (isTest) => isTest
                   ? Container(
@@ -109,12 +102,11 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── Connect Your Telegram Section ──────────────────
+            // ── Your Telegram ──────────────────────────────────
             const _SectionHeader(title: 'Your Telegram'),
             const Text(
-              'Connect your own Telegram account to receive '
-              'test alerts. Uses the same verification flow '
-              'as your emergency contacts.',
+              'Connect your Telegram to receive test alerts. '
+              'Uses the same verification flow as your contacts.',
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -147,7 +139,7 @@ class SettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Connection status row
+                      // Status row
                       Row(
                         children: [
                           Icon(
@@ -215,7 +207,6 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ),
 
-                      // Refresh hint shown when not yet verified
                       if (!profile.telegramVerified) ...[
                         const SizedBox(height: 8),
                         SizedBox(
@@ -238,7 +229,99 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── Alert Settings Section ─────────────────────────
+            // ── Trigger Methods ────────────────────────────────
+            const _SectionHeader(title: 'Trigger Methods'),
+            const Text(
+              'Choose which methods can activate an SOS alert. '
+              'The manual SOS button is always available.',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+
+            Card(
+              child: Column(
+                children: [
+                  // Volume button toggle
+                  volumeEnabled.when(
+                    data: (isEnabled) => SwitchListTile(
+                      secondary: Icon(
+                        Icons.volume_up,
+                        color: isEnabled ? Colors.red : Colors.grey,
+                      ),
+                      title: const Text('Volume Button'),
+                      subtitle: const Text(
+                        'Triple press volume button to trigger SOS',
+                      ),
+                      value: isEnabled,
+                      activeColor: Colors.red,
+                      onChanged: (value) => ref
+                          .read(volumeTriggerProvider.notifier)
+                          .setValue(value),
+                    ),
+                    loading: () => const ListTile(title: Text('Volume Button')),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+
+                  // Shake toggle
+                  shakeEnabled.when(
+                    data: (isEnabled) => SwitchListTile(
+                      secondary: Icon(
+                        Icons.vibration,
+                        color: isEnabled ? Colors.red : Colors.grey,
+                      ),
+                      title: const Text('Shake Detection'),
+                      subtitle: const Text(
+                        'Shake phone firmly twice to trigger SOS',
+                      ),
+                      value: isEnabled,
+                      activeColor: Colors.red,
+                      onChanged: (value) => ref
+                          .read(shakeTriggerProvider.notifier)
+                          .setValue(value),
+                    ),
+                    loading: () =>
+                        const ListTile(title: Text('Shake Detection')),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+
+                  // Manual — always on, no toggle
+                  ListTile(
+                    leading: const Icon(Icons.touch_app, color: Colors.red),
+                    title: const Text('Manual SOS Button'),
+                    subtitle: const Text(
+                      'Always available — cannot be disabled',
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: const Text(
+                        'Always On',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Alert Settings ─────────────────────────────────
             const _SectionHeader(title: 'Alert Settings'),
             Card(
               child: silentMode.when(
@@ -271,7 +354,7 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── How To Section ─────────────────────────────────
+            // ── How To Use Test Mode ───────────────────────────
             const _SectionHeader(title: 'How to use Test Mode'),
             const Card(
               child: Padding(
@@ -288,7 +371,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     _HowToStep(
                       number: '3',
-                      text: 'Tap Start in the bot — you get a confirmation',
+                      text: 'Tap Start in the bot — receive confirmation',
                     ),
                     _HowToStep(
                       number: '4',
@@ -296,11 +379,11 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     _HowToStep(
                       number: '5',
-                      text: 'Enable Test Mode with the toggle above',
+                      text: 'Enable Test Mode with the toggle',
                     ),
                     _HowToStep(
                       number: '6',
-                      text: 'Trigger an SOS — you receive the test alert',
+                      text: 'Trigger SOS — you receive the test alert',
                     ),
                     _HowToStep(
                       number: '7',
@@ -331,40 +414,20 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
 
-    final message =
-        'AlertGuard - Connect My Telegram\n\n'
-        'Tap this link to connect your Telegram to your '
-        'AlertGuard account. This allows you to receive '
-        'test SOS alerts:\n\n'
-        '$inviteLink\n\n'
-        'Once you tap Start in Telegram, come back to '
-        'the app and tap refresh.';
-
-    final encodedText = Uri.encodeComponent(message);
-    final encodedUrl = Uri.encodeComponent(inviteLink);
-
-    final tgNative = Uri.parse(
-      'tg://msg_url?url=$encodedUrl&text=$encodedText',
+    await Share.share(
+      '🛡️ AlertGuard — Connect My Telegram\n\n'
+      'Tap this link to connect your Telegram to your '
+      'AlertGuard account. This lets you receive test '
+      'SOS alerts:\n\n'
+      '$inviteLink\n\n'
+      'Once you tap Start in Telegram, come back to '
+      'the app and tap refresh.',
+      subject: 'Connect AlertGuard to Telegram',
     );
-    final tgWeb = Uri.parse(
-      'https://t.me/share/url?url=$encodedUrl&text=$encodedText',
-    );
-
-    if (await canLaunchUrl(tgNative)) {
-      await launchUrl(tgNative, mode: LaunchMode.externalApplication);
-      return;
-    }
-
-    if (await canLaunchUrl(tgWeb)) {
-      await launchUrl(tgWeb, mode: LaunchMode.externalApplication);
-      return;
-    }
-
-    await Share.share(message, subject: 'Connect AlertGuard to Telegram');
   }
 }
 
-// ── Supporting widgets ────────────────────────────────────────────
+// ── Supporting Widgets ────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -385,6 +448,7 @@ class _SectionHeader extends StatelessWidget {
 class _HowToStep extends StatelessWidget {
   final String number;
   final String text;
+
   const _HowToStep({super.key, required this.number, required this.text});
 
   @override
