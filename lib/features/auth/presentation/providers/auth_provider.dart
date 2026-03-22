@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth_repository.dart';
 import '../../../contacts/presentation/providers/contact_provider.dart';
+import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -66,6 +67,7 @@ class AuthNotifier extends AsyncNotifier<void> {
   void _invalidateSessionScopedProviders() {
     ref.invalidate(authStateProvider);
     ref.invalidate(contactsProvider);
+    ref.invalidate(profileProvider);
   }
 }
 

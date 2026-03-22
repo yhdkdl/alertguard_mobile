@@ -5,26 +5,49 @@ import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/onboarding/presentation/providers/onboarding_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  // This notifier tells GoRouter to re-evaluate redirect
-  // whenever auth state changes
   final notifier = _RouterNotifier(ref);
 
   return GoRouter(
-    initialLocation: '/login',
-    refreshListenable: notifier, // ← KEY: re-runs redirect on auth change
+    initialLocation: '/onboarding',
+    refreshListenable: notifier,
     redirect: (context, state) async {
+      final onboardingDone = await ref.read(onboardingProvider.future);
       final isLoggedIn = await ref.read(authStateProvider.future);
-      final isOnAuthRoute =
-          state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
 
+      final path = state.matchedLocation;
+
+      // Step 1 — Show onboarding first if never seen
+      if (!onboardingDone) {
+        if (path != '/onboarding') return '/onboarding';
+        return null;
+      }
+
+      // Step 2 — Onboarding done, handle auth
+      final isOnAuthRoute = path == '/login' || path == '/register';
+      final isOnOnboarding = path == '/onboarding';
+
+      // Redirect away from onboarding if already done
+      if (isOnOnboarding) {
+        return isLoggedIn ? '/home' : '/login';
+      }
+
+      // Redirect to home if logged in and on auth screen
       if (isLoggedIn && isOnAuthRoute) return '/home';
+
+      // Redirect to login if not logged in
       if (!isLoggedIn && !isOnAuthRoute) return '/login';
+
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
@@ -35,12 +58,11 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Listens to Riverpod auth state and notifies GoRouter to re-run redirect
 class _RouterNotifier extends ChangeNotifier {
   final Ref _ref;
 
   _RouterNotifier(this._ref) {
-    // Watch authStateProvider — call notifyListeners when it changes
     _ref.listen(authStateProvider, (_, __) => notifyListeners());
+    _ref.listen(onboardingProvider, (_, __) => notifyListeners());
   }
 }

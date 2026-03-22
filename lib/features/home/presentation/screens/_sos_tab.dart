@@ -7,7 +7,8 @@ import '../../../../core/services/trigger_service.dart';
 import '../../../../core/services/alert_service.dart';
 
 class SosTab extends ConsumerStatefulWidget {
-  const SosTab({super.key});
+  final Function(int)? onSwitchTab;
+  const SosTab({super.key, this.onSwitchTab});
 
   @override
   ConsumerState<SosTab> createState() => _SosTabState();

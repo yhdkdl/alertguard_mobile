@@ -71,6 +71,10 @@ dependencies:
 
   # Internet reachability check (connectivity_plus only checks network, not internet)
   internet_connection_checker_plus: ^2.5.1
+
+
+  # Smooth page indicator for onboarding dots
+  smooth_page_indicator: ^1.1.0
   
 dev_dependencies:
   flutter_test:

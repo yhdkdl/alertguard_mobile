@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_provider.dart';
-import '../../../profile/data/profile_model.dart';
-import '../../../profile/data/profile_repository.dart';
-
-final profileProvider = FutureProvider<ProfileModel>((ref) async {
-  return ProfileRepository().getProfile();
-});
+import '../../../profile/presentation/providers/profile_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -40,30 +36,66 @@ class SettingsScreen extends ConsumerWidget {
             // ── Test Mode ──────────────────────────────────────
             const _SectionHeader(title: 'Test Mode'),
             Card(
-              child: testMode.when(
-                data: (isTest) => SwitchListTile(
-                  secondary: Icon(
-                    Icons.science_outlined,
-                    color: isTest ? Colors.orange : Colors.grey,
+              child: Column(
+                children: [
+                  testMode.when(
+                    data: (isTest) => profileState.maybeWhen(
+                      data: (profile) => SwitchListTile(
+                        secondary: Icon(
+                          Icons.science_outlined,
+                          color: isTest
+                              ? Colors.orange
+                              : profile.telegramVerified
+                              ? Colors.grey
+                              : Colors.grey.shade300,
+                        ),
+                        title: Text(
+                          'Test Mode',
+                          style: TextStyle(
+                            color: profile.telegramVerified
+                                ? null
+                                : Colors.grey,
+                          ),
+                        ),
+                        subtitle: Text(
+                          profile.telegramVerified
+                              ? 'Alerts sent only to you — contacts not notified'
+                              : 'Connect your Telegram first to enable Test Mode',
+                          style: TextStyle(
+                            color: profile.telegramVerified
+                                ? null
+                                : Colors.grey.shade400,
+                          ),
+                        ),
+                        value: isTest,
+                        activeColor: Colors.orange,
+                        // onChanged is null when telegram not connected
+                        // null makes the toggle appear disabled
+                        onChanged: profile.telegramVerified
+                            ? (value) => ref
+                                  .read(testModeProvider.notifier)
+                                  .setValue(value)
+                            : null,
+                      ),
+                      orElse: () => SwitchListTile(
+                        secondary: const Icon(Icons.science_outlined),
+                        title: const Text('Test Mode'),
+                        subtitle: const Text('Loading...'),
+                        value: isTest,
+                        onChanged: null,
+                      ),
+                    ),
+                    loading: () => const ListTile(
+                      title: Text('Test Mode'),
+                      trailing: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
                   ),
-                  title: const Text('Test Mode'),
-                  subtitle: const Text(
-                    'Alerts sent only to you — contacts not notified',
-                  ),
-                  value: isTest,
-                  activeColor: Colors.orange,
-                  onChanged: (value) =>
-                      ref.read(testModeProvider.notifier).setValue(value),
-                ),
-                loading: () => const ListTile(
-                  title: Text('Test Mode'),
-                  trailing: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
+                ],
               ),
             ),
 
@@ -405,7 +437,8 @@ class SettingsScreen extends ConsumerWidget {
     BuildContext context,
     String? inviteLink,
   ) async {
-    if (inviteLink == null || inviteLink.isEmpty) {
+    final link = inviteLink?.trim() ?? '';
+    if (link.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not load invite link — try refreshing'),
@@ -414,16 +447,43 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
 
-    await Share.share(
-      '🛡️ AlertGuard — Connect My Telegram\n\n'
-      'Tap this link to connect your Telegram to your '
-      'AlertGuard account. This lets you receive test '
-      'SOS alerts:\n\n'
-      '$inviteLink\n\n'
-      'Once you tap Start in Telegram, come back to '
-      'the app and tap refresh.',
-      subject: 'Connect AlertGuard to Telegram',
+    // Best path for "Connect My Telegram": open the invite link directly.
+    final inviteUri = Uri.tryParse(link);
+    if (inviteUri != null && await canLaunchUrl(inviteUri)) {
+      await launchUrl(inviteUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    // Fallback: attempt Telegram share URLs directly before generic share sheet.
+    final message =
+        'AlertGuard - Connect My Telegram\n\n'
+        'Tap this link to connect your Telegram to your '
+        'AlertGuard account. This lets you receive test '
+        'SOS alerts:\n\n'
+        '$link\n\n'
+        'Once you tap Start in Telegram, come back to '
+        'the app and tap refresh.';
+
+    final encodedText = Uri.encodeComponent(message);
+    final encodedUrl = Uri.encodeComponent(link);
+    final tgNative = Uri.parse(
+      'tg://msg_url?url=$encodedUrl&text=$encodedText',
     );
+    final tgWeb = Uri.parse(
+      'https://t.me/share/url?url=$encodedUrl&text=$encodedText',
+    );
+
+    if (await canLaunchUrl(tgNative)) {
+      await launchUrl(tgNative, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    if (await canLaunchUrl(tgWeb)) {
+      await launchUrl(tgWeb, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    await Share.share(message, subject: 'Connect AlertGuard to Telegram');
   }
 }
 
