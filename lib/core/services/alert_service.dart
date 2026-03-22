@@ -9,6 +9,8 @@ import 'queue_service.dart';
 
 enum AlertResult { sent, queued, failed }
 
+enum _SendOutcome { sent, retryableFailure, nonRetryableFailure }
+
 class AlertService {
   final Dio _dio = DioClient.uploadInstance;
 
@@ -65,7 +67,7 @@ class AlertService {
       }
 
       // Step 4 — Send immediately
-      final success = await _sendToBackend(
+      final sendOutcome = await _sendToBackend(
         triggerType: triggerType,
         latitude: latitude,
         longitude: longitude,
@@ -75,9 +77,14 @@ class AlertService {
         idempotencyKey: idempotencyKey,
       );
 
-      if (success) {
+      if (sendOutcome == _SendOutcome.sent) {
         _cleanupPhotos(photos);
         return AlertResult.sent;
+      }
+
+      if (sendOutcome == _SendOutcome.nonRetryableFailure) {
+        print('[AlertService] Non-retryable backend rejection — not queuing');
+        return AlertResult.failed;
       }
 
       // Step 5 — Send failed even with internet — queue for retry
@@ -110,7 +117,7 @@ class AlertService {
     for (final alert in pending) {
       print('[AlertService] Attempting queued alert id: ${alert.id}');
 
-      final success = await _sendToBackend(
+      final sendOutcome = await _sendToBackend(
         triggerType: alert.triggerType,
         latitude: alert.latitude,
         longitude: alert.longitude,
@@ -124,11 +131,12 @@ class AlertService {
         idempotencyKey: alert.idempotencyKey,
       );
 
-      if (success) {
+      if (sendOutcome == _SendOutcome.sent ||
+          sendOutcome == _SendOutcome.nonRetryableFailure) {
         await QueueService.dequeue(alert.id!);
         print(
           '[AlertService] Queued alert ${alert.id} '
-          'delivered and dequeued',
+          '${sendOutcome == _SendOutcome.sent ? 'delivered' : 'dropped (non-retryable)'} and dequeued',
         );
       } else {
         await QueueService.incrementRetry(alert.id!);
@@ -142,7 +150,7 @@ class AlertService {
     await QueueService.pruneExhausted();
   }
 
-  Future<bool> _sendToBackend({
+  Future<_SendOutcome> _sendToBackend({
     required String triggerType,
     double? latitude,
     double? longitude,
@@ -158,8 +166,12 @@ class AlertService {
         if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
       };
 
-      if (latitude != null) formFields['latitude'] = latitude.toString();
-      if (longitude != null) formFields['longitude'] = longitude.toString();
+      if (latitude != null) {
+        formFields['latitude'] = latitude.toStringAsFixed(6);
+      }
+      if (longitude != null) {
+        formFields['longitude'] = longitude.toStringAsFixed(6);
+      }
 
       if (frontPhoto != null) {
         formFields['front_photo'] = await MultipartFile.fromFile(
@@ -188,10 +200,29 @@ class AlertService {
 
       // 201 = new alert created
       // 200 = idempotent match — already existed, no duplicate
-      return response.statusCode == 201 || response.statusCode == 200;
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return _SendOutcome.sent;
+      }
+
+      // Unexpected non-exception status: retry for server-side transient issues.
+      return _SendOutcome.retryableFailure;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final responseData = e.response?.data;
+
+      print(
+        '[AlertService] Backend send failed: '
+        'status=$statusCode data=$responseData message=${e.message}',
+      );
+
+      if (statusCode != null && statusCode >= 400 && statusCode < 500) {
+        return _SendOutcome.nonRetryableFailure;
+      }
+
+      return _SendOutcome.retryableFailure;
     } catch (e) {
       print('[AlertService] Backend send failed: $e');
-      return false;
+      return _SendOutcome.retryableFailure;
     }
   }
 
