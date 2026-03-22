@@ -23,8 +23,15 @@ class TriggerService {
     this.onCountdownTick,
   });
 
+  // Mode flags
   bool _silentMode = false;
   bool _testMode = false;
+
+  // Trigger enable flags
+  bool _volumeEnabled = true;
+  bool _shakeEnabled = true;
+  // Manual is always enabled — no flag needed
+
   bool _isArmed = false;
   bool _isCounting = false;
   Timer? _countdownTimer;
@@ -43,6 +50,8 @@ class TriggerService {
 
   void setSilentMode(bool value) => _silentMode = value;
   void setTestMode(bool value) => _testMode = value;
+  void setVolumeEnabled(bool value) => _volumeEnabled = value;
+  void setShakeEnabled(bool value) => _shakeEnabled = value;
 
   void arm() {
     if (_isArmed) return;
@@ -74,6 +83,8 @@ class TriggerService {
 
   void _startVolumeListener() {
     VolumeController().listener((volume) {
+      if (!_volumeEnabled) return;
+
       final now = DateTime.now();
 
       if (_lastVolume == null) {
@@ -108,7 +119,7 @@ class TriggerService {
     const Duration shakeDebounce = Duration(milliseconds: 700);
 
     _accelerometerSub = accelerometerEventStream().listen((event) {
-      if (!_isArmed || _isCounting) return;
+      if (!_isArmed || _isCounting || !_shakeEnabled) return;
 
       final double magnitude =
           sqrt(event.x * event.x + event.y * event.y + event.z * event.z) - 9.8;

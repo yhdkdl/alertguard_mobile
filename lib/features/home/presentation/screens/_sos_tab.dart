@@ -53,13 +53,17 @@ class _SosTabState extends ConsumerState<SosTab> {
       },
     );
 
-    // Read initial values for both modes then arm
+    // Read all settings before arming
     Future.wait([
       ref.read(silentModeProvider.future),
       ref.read(testModeProvider.future),
+      ref.read(volumeTriggerProvider.future),
+      ref.read(shakeTriggerProvider.future),
     ]).then((values) {
       _triggerService.setSilentMode(values[0] as bool);
       _triggerService.setTestMode(values[1] as bool);
+      _triggerService.setVolumeEnabled(values[2] as bool);
+      _triggerService.setShakeEnabled(values[3] as bool);
       _triggerService.arm();
     });
   }
@@ -74,10 +78,14 @@ class _SosTabState extends ConsumerState<SosTab> {
   Widget build(BuildContext context) {
     final silentMode = ref.watch(silentModeProvider);
     final testMode = ref.watch(testModeProvider);
+    final volumeEnabled = ref.watch(volumeTriggerProvider);
+    final shakeEnabled = ref.watch(shakeTriggerProvider);
 
-    // Keep service in sync whenever providers change
+    // Keep service in sync with provider changes
     silentMode.whenData((v) => _triggerService.setSilentMode(v));
     testMode.whenData((v) => _triggerService.setTestMode(v));
+    volumeEnabled.whenData((v) => _triggerService.setVolumeEnabled(v));
+    shakeEnabled.whenData((v) => _triggerService.setShakeEnabled(v));
 
     final bool isTestActive = testMode.maybeWhen(
       data: (v) => v,
@@ -138,6 +146,18 @@ class _SosTabState extends ConsumerState<SosTab> {
                     ],
                   ),
                 ),
+
+              // ── Active triggers indicator ─────────────────────
+              _ActiveTriggersBar(
+                volumeEnabled: volumeEnabled.maybeWhen(
+                  data: (v) => v,
+                  orElse: () => true,
+                ),
+                shakeEnabled: shakeEnabled.maybeWhen(
+                  data: (v) => v,
+                  orElse: () => true,
+                ),
+              ),
 
               // ── SOS UI ───────────────────────────────────────
               Expanded(
@@ -273,7 +293,7 @@ class _SosTabState extends ConsumerState<SosTab> {
                             ? 'Sending in $_countdown seconds...'
                             : isTestActive
                             ? 'Test mode — only you will be notified'
-                            : 'Press SOS or double-press volume button',
+                            : 'Press SOS or use the other built in functionalities ',
                         style: TextStyle(color: Colors.grey[600], fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
@@ -309,6 +329,91 @@ class _SosTabState extends ConsumerState<SosTab> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Active Triggers Indicator Bar ─────────────────────────────────
+// Shows the user which triggers are currently active
+// so they always know how they can trigger an alert.
+
+class _ActiveTriggersBar extends StatelessWidget {
+  final bool volumeEnabled;
+  final bool shakeEnabled;
+
+  const _ActiveTriggersBar({
+    required this.volumeEnabled,
+    required this.shakeEnabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      color: Colors.grey.shade50,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Active triggers: ',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          _TriggerChip(
+            icon: Icons.touch_app,
+            label: 'Manual',
+            enabled: true, // always on
+          ),
+          if (volumeEnabled) ...[
+            const SizedBox(width: 6),
+            _TriggerChip(icon: Icons.volume_up, label: 'Volume', enabled: true),
+          ],
+          if (shakeEnabled) ...[
+            const SizedBox(width: 6),
+            _TriggerChip(icon: Icons.vibration, label: 'Shake', enabled: true),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TriggerChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool enabled;
+
+  const _TriggerChip({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: enabled ? Colors.red.shade50 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: enabled ? Colors.red.shade200 : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: enabled ? Colors.red : Colors.grey),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: enabled ? Colors.red : Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

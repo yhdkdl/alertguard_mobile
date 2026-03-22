@@ -58,3 +58,36 @@ class TestModeNotifier extends AsyncNotifier<bool> {
 final testModeProvider = AsyncNotifierProvider<TestModeNotifier, bool>(
   TestModeNotifier.new,
 );
+
+// ── Trigger Preferences ───────────────────────────────────────────
+// Each hardware trigger can be independently enabled or disabled.
+// The manual SOS button is always enabled and has no toggle.
+
+class _TriggerPrefNotifier extends AsyncNotifier<bool> {
+  final String key;
+  final bool defaultValue;
+
+  _TriggerPrefNotifier({required this.key, required this.defaultValue});
+
+  @override
+  Future<bool> build() async {
+    final prefs = await ref.read(sharedPreferencesProvider.future);
+    return prefs.getBool(key) ?? defaultValue;
+  }
+
+  Future<void> setValue(bool value) async {
+    final prefs = await ref.read(sharedPreferencesProvider.future);
+    await prefs.setBool(key, value);
+    state = AsyncData(value);
+  }
+}
+
+// Volume button trigger — enabled by default
+final volumeTriggerProvider = AsyncNotifierProvider<_TriggerPrefNotifier, bool>(
+  () => _TriggerPrefNotifier(key: 'trigger_volume', defaultValue: true),
+);
+
+// Shake trigger — enabled by default
+final shakeTriggerProvider = AsyncNotifierProvider<_TriggerPrefNotifier, bool>(
+  () => _TriggerPrefNotifier(key: 'trigger_shake', defaultValue: true),
+);
