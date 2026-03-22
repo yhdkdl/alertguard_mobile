@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../contacts/presentation/screens/contact_screen.dart';
-import '../../../../core/services/trigger_service.dart';
-import '../../../settings/presentation/providers/settings_provider.dart';
+import '../../../history/presentation/screens/history_screen.dart';
 import '_sos_tab.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -17,7 +14,12 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentTab = 0;
 
-  final List<Widget> _tabs = const [SosTab(), ContactsScreen()];
+  // IndexedStack keeps all tabs alive — triggers keep running
+  final List<Widget> _tabs = const [
+    SosTab(),
+    ContactsScreen(),
+    HistoryScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: Icon(Icons.contacts_outlined),
             selectedIcon: Icon(Icons.contacts),
             label: 'Contacts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'History',
           ),
         ],
       ),
