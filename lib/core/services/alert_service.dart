@@ -4,56 +4,173 @@ import 'package:geolocator/geolocator.dart';
 import '../network/dio_client.dart';
 import 'location_service.dart';
 import 'camera_service.dart';
+import 'connectivity_service.dart';
+import 'queue_service.dart';
+
+enum AlertResult { sent, queued, failed }
 
 class AlertService {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio = DioClient.uploadInstance;
 
-  Future<bool> sendAlert({
+  Future<AlertResult> sendAlert({
     required String triggerType,
     bool isTest = false,
   }) async {
     try {
       print('[AlertService] Starting alert capture...');
 
-      // Run GPS and camera capture in parallel for speed
+      // Step 1 — Capture GPS + photos in parallel
       final results = await Future.wait([
         LocationService.getCurrentLocation(),
         CameraService.captureAlertPhotos(),
       ]);
 
-      final position = results[0] as Position?; // Position? from GPS
+      final position = results[0] as Position?;
       final photos = results[1] as Map<String, File?>;
+      final latitude = position?.latitude;
+      final longitude = position?.longitude;
+      final frontPhoto = photos['front'];
+      final rearPhoto = photos['rear'];
 
       print('[AlertService] GPS: $position');
       print(
-        '[AlertService] Photos: front=${photos['front']?.path}, rear=${photos['rear']?.path}',
+        '[AlertService] Photos: '
+        'front=${frontPhoto?.path}, rear=${rearPhoto?.path}',
       );
 
-      // Build multipart form data
+      if (position == null) {
+        print('[AlertService] No GPS fix — sending without coordinates');
+      }
+
+      // Step 2 — Generate idempotency key once
+      // Same key reused on every retry — prevents duplicate alerts
+      final idempotencyKey =
+          'alert_${DateTime.now().millisecondsSinceEpoch}_$triggerType';
+
+      // Step 3 — Check real internet connectivity
+      final hasInternet = await ConnectivityService.hasInternet();
+
+      if (!hasInternet) {
+        print('[AlertService] No internet — queuing alert locally');
+        await QueueService.enqueue(
+          triggerType: triggerType,
+          latitude: latitude,
+          longitude: longitude,
+          frontPhotoPath: frontPhoto?.path,
+          rearPhotoPath: rearPhoto?.path,
+          isTest: isTest,
+          idempotencyKey: idempotencyKey,
+        );
+        return AlertResult.queued;
+      }
+
+      // Step 4 — Send immediately
+      final success = await _sendToBackend(
+        triggerType: triggerType,
+        latitude: latitude,
+        longitude: longitude,
+        frontPhoto: frontPhoto,
+        rearPhoto: rearPhoto,
+        isTest: isTest,
+        idempotencyKey: idempotencyKey,
+      );
+
+      if (success) {
+        _cleanupPhotos(photos);
+        return AlertResult.sent;
+      }
+
+      // Step 5 — Send failed even with internet — queue for retry
+      print('[AlertService] Send failed — queuing for retry');
+      await QueueService.enqueue(
+        triggerType: triggerType,
+        latitude: latitude,
+        longitude: longitude,
+        frontPhotoPath: frontPhoto?.path,
+        rearPhotoPath: rearPhoto?.path,
+        isTest: isTest,
+        idempotencyKey: idempotencyKey,
+      );
+      return AlertResult.queued;
+    } catch (e) {
+      print('[AlertService] Unexpected error: $e');
+      return AlertResult.failed;
+    }
+  }
+
+  /// Retry all pending alerts from the local queue.
+  /// Called by QueueMonitor when connectivity is restored.
+  Future<void> retryPendingAlerts() async {
+    final pending = await QueueService.getPendingAlerts();
+
+    print('[AlertService] Retrying ${pending.length} pending alerts...');
+
+    if (pending.isEmpty) return;
+
+    for (final alert in pending) {
+      print('[AlertService] Attempting queued alert id: ${alert.id}');
+
+      final success = await _sendToBackend(
+        triggerType: alert.triggerType,
+        latitude: alert.latitude,
+        longitude: alert.longitude,
+        frontPhoto: QueueService.photoExists(alert.frontPhotoPath)
+            ? File(alert.frontPhotoPath!)
+            : null,
+        rearPhoto: QueueService.photoExists(alert.rearPhotoPath)
+            ? File(alert.rearPhotoPath!)
+            : null,
+        isTest: alert.isTest,
+        idempotencyKey: alert.idempotencyKey,
+      );
+
+      if (success) {
+        await QueueService.dequeue(alert.id!);
+        print(
+          '[AlertService] Queued alert ${alert.id} '
+          'delivered and dequeued',
+        );
+      } else {
+        await QueueService.incrementRetry(alert.id!);
+        print(
+          '[AlertService] Queued alert ${alert.id} '
+          'retry failed — count incremented',
+        );
+      }
+    }
+
+    await QueueService.pruneExhausted();
+  }
+
+  Future<bool> _sendToBackend({
+    required String triggerType,
+    double? latitude,
+    double? longitude,
+    File? frontPhoto,
+    File? rearPhoto,
+    bool isTest = false,
+    String? idempotencyKey,
+  }) async {
+    try {
       final formFields = <String, dynamic>{
         'trigger_type': triggerType,
         'is_test': isTest.toString(),
+        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
       };
 
-      // Add GPS if available
-      if (position != null) {
-        formFields['latitude'] = position.latitude.toString();
-        formFields['longitude'] = position.longitude.toString();
-      } else {
-        print('[AlertService] No GPS fix available; sending alert without coordinates.');
-      }
+      if (latitude != null) formFields['latitude'] = latitude.toString();
+      if (longitude != null) formFields['longitude'] = longitude.toString();
 
-      // Add photos if available
-      if (photos['front'] != null) {
+      if (frontPhoto != null) {
         formFields['front_photo'] = await MultipartFile.fromFile(
-          photos['front']!.path,
+          frontPhoto.path,
           filename: 'front_photo.jpg',
         );
       }
 
-      if (photos['rear'] != null) {
+      if (rearPhoto != null) {
         formFields['rear_photo'] = await MultipartFile.fromFile(
-          photos['rear']!.path,
+          rearPhoto.path,
           filename: 'rear_photo.jpg',
         );
       }
@@ -64,13 +181,16 @@ class AlertService {
         options: Options(contentType: 'multipart/form-data'),
       );
 
-      // Clean up temp photo files after upload
-      _cleanupPhotos(photos);
+      print(
+        '[AlertService] Backend response: '
+        '${response.statusCode} ${response.data}',
+      );
 
-      print('[AlertService] Alert sent. Status: ${response.data['status']}');
-      return response.statusCode == 201;
+      // 201 = new alert created
+      // 200 = idempotent match — already existed, no duplicate
+      return response.statusCode == 201 || response.statusCode == 200;
     } catch (e) {
-      print('[AlertService] Failed to send alert: $e');
+      print('[AlertService] Backend send failed: $e');
       return false;
     }
   }

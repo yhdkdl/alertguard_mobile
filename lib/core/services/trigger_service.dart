@@ -12,7 +12,7 @@ class TriggerService {
   static const int countdownSeconds = 5;
 
   final VoidCallback? onCountdownStart;
-  final VoidCallback? onAlertSent;
+  final Function(AlertResult)? onAlertSent;
   final VoidCallback? onAlertCancelled;
   final Function(int)? onCountdownTick;
 
@@ -164,14 +164,10 @@ class TriggerService {
   }
 
   Future<void> _sendAlert(TriggerType type) async {
-    final success = await alertServiceInstance.sendAlert(
+    final result = await alertServiceInstance.sendAlert(
       triggerType: _triggerTypeToString(type),
     );
-    if (success) {
-      onAlertSent?.call();
-    } else {
-      onAlertCancelled?.call();
-    }
+    onAlertSent?.call(result); // passes result to UI
   }
 
   Future<void> _vibrateAlert() async {

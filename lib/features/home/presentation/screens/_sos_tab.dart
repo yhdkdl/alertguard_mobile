@@ -5,6 +5,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/services/trigger_service.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../../core/services/permission_service.dart';
+import '../../../../core/services/alert_service.dart';
 
 class SosTab extends ConsumerStatefulWidget {
   const SosTab({super.key});
@@ -18,7 +19,7 @@ class _SosTabState extends ConsumerState<SosTab> {
   bool _isCounting = false;
   int _countdown = 5;
   bool _alertSent = false;
-
+  AlertResult? _lastResult;
   @override
   void initState() {
     super.initState();
@@ -44,16 +45,17 @@ class _SosTabState extends ConsumerState<SosTab> {
       onCountdownTick: (seconds) {
         if (mounted) setState(() => _countdown = seconds);
       },
-      onAlertSent: () {
-        if (mounted)
+      onAlertSent: (result) {
+        if (mounted) {
           setState(() {
             _isCounting = false;
-            _countdown = 5;
-            _alertSent = true;
+            _lastResult = result;
           });
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) setState(() => _alertSent = false);
-        });
+          // Reset after 3 seconds
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _lastResult = null);
+          });
+        }
       },
       onAlertCancelled: () {
         if (mounted)
@@ -113,7 +115,7 @@ class _SosTabState extends ConsumerState<SosTab> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (_alertSent)
+                if (_lastResult != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 24),
                     padding: const EdgeInsets.symmetric(
@@ -121,17 +123,32 @@ class _SosTabState extends ConsumerState<SosTab> {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: _lastResult == AlertResult.sent
+                          ? Colors.green
+                          : _lastResult == AlertResult.queued
+                          ? Colors.orange
+                          : Colors.red,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle, color: Colors.white),
-                        SizedBox(width: 8),
+                        Icon(
+                          _lastResult == AlertResult.sent
+                              ? Icons.check_circle
+                              : _lastResult == AlertResult.queued
+                              ? Icons.schedule
+                              : Icons.error,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
                         Text(
-                          'SOS Alert Sent',
-                          style: TextStyle(
+                          _lastResult == AlertResult.sent
+                              ? 'SOS Alert Sent'
+                              : _lastResult == AlertResult.queued
+                              ? 'Alert Queued — will send when online'
+                              : 'Alert Failed',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
@@ -139,7 +156,6 @@ class _SosTabState extends ConsumerState<SosTab> {
                       ],
                     ),
                   ),
-
                 GestureDetector(
                   onTap: _isCounting
                       ? () => _triggerService.cancelCountdown()
