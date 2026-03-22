@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth_repository.dart';
 import '../../../contacts/presentation/providers/contact_provider.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository();
@@ -31,6 +32,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           _repo.register(email: email, fullName: fullName, password: password),
     );
     if (!state.hasError) {
+      await _resetSessionFlags();
       _invalidateSessionScopedProviders();
     }
   }
@@ -41,6 +43,7 @@ class AuthNotifier extends AsyncNotifier<void> {
       () => _repo.login(email: email, password: password),
     );
     if (!state.hasError) {
+      await _resetSessionFlags();
       _invalidateSessionScopedProviders();
     }
   }
@@ -49,8 +52,15 @@ class AuthNotifier extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _repo.logout());
     if (!state.hasError) {
+      await _resetSessionFlags();
       _invalidateSessionScopedProviders();
     }
+  }
+
+  Future<void> _resetSessionFlags() async {
+    // Prevent a previous account's safety mode from leaking into a new session.
+    await ref.read(testModeProvider.notifier).setValue(false);
+    ref.invalidate(testModeProvider);
   }
 
   void _invalidateSessionScopedProviders() {

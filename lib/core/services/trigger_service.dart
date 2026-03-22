@@ -24,6 +24,7 @@ class TriggerService {
   });
 
   bool _silentMode = false;
+  bool _testMode = false;
   bool _isArmed = false;
   bool _isCounting = false;
   Timer? _countdownTimer;
@@ -38,7 +39,10 @@ class TriggerService {
   DateTime? _lastShakeTime;
   int _shakeCount = 0;
 
+  // ── Public API ─────────────────────────────────────────────────
+
   void setSilentMode(bool value) => _silentMode = value;
+  void setTestMode(bool value) => _testMode = value;
 
   void arm() {
     if (_isArmed) return;
@@ -66,6 +70,8 @@ class TriggerService {
     onAlertCancelled?.call();
   }
 
+  // ── Volume Button ──────────────────────────────────────────────
+
   void _startVolumeListener() {
     VolumeController().listener((volume) {
       final now = DateTime.now();
@@ -86,7 +92,6 @@ class TriggerService {
         _volumePressCount++;
         _lastVolumeChange = now;
 
-        // Require 3 consecutive volume changes within 2 seconds.
         if (_volumePressCount >= 3) {
           _volumePressCount = 0;
           _onTriggerDetected(TriggerType.volumeButton);
@@ -94,6 +99,8 @@ class TriggerService {
       }
     });
   }
+
+  // ── Shake Detection ────────────────────────────────────────────
 
   void _startShakeDetector() {
     const double shakeThreshold = 15.0;
@@ -109,7 +116,6 @@ class TriggerService {
       if (magnitude > shakeThreshold) {
         final now = DateTime.now();
 
-        // Debounce spikes from one shake motion.
         if (_lastShakeTime != null &&
             now.difference(_lastShakeTime!) < shakeDebounce) {
           return;
@@ -123,7 +129,6 @@ class TriggerService {
         _shakeCount++;
         _lastShakeTime = now;
 
-        // Require 2 shakes within shakeWindow.
         if (_shakeCount >= 2) {
           _shakeCount = 0;
           _lastShakeTime = null;
@@ -132,6 +137,8 @@ class TriggerService {
       }
     });
   }
+
+  // ── Trigger Handler ────────────────────────────────────────────
 
   void _onTriggerDetected(TriggerType type) {
     if (_isCounting) return;
@@ -166,8 +173,9 @@ class TriggerService {
   Future<void> _sendAlert(TriggerType type) async {
     final result = await alertServiceInstance.sendAlert(
       triggerType: _triggerTypeToString(type),
+      isTest: _testMode,
     );
-    onAlertSent?.call(result); // passes result to UI
+    onAlertSent?.call(result);
   }
 
   Future<void> _vibrateAlert() async {
