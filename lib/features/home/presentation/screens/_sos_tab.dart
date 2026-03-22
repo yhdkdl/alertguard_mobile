@@ -294,7 +294,7 @@ class _SosTabState extends ConsumerState<SosTab> {
                             ? 'Sending in $_countdown seconds...'
                             : isTestActive
                             ? 'Test mode — only you will be notified'
-                            : 'Press SOS or use the other built in functionalities ',
+                            : 'Press SOS or use the other built in triggers ',
                         style: TextStyle(color: Colors.grey[600], fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
