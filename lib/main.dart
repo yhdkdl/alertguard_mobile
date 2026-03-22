@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
 import 'core/services/background_service.dart';
+import 'core/services/queue_monitor.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +11,7 @@ void main() async {
   // Do not crash app startup if service init fails on a device/config.
   try {
     await initializeBackgroundService();
+    QueueMonitor.instance.start();
   } catch (e, st) {
     debugPrint('Background service init failed: $e');
     debugPrintStack(stackTrace: st);
