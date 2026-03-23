@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:usesCleartextTraffic="true"
-        android:label="alertguard_mobile"
+        android:label="AlertGuard"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
      

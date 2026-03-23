@@ -119,6 +119,15 @@ class _AuthInterceptor extends Interceptor {
     final data = err.response?.data;
     String message = 'Something went wrong';
 
+    // Connection/timeout cases usually indicate network instability
+    // or a cold backend waking up.
+    if (err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.sendTimeout ||
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.connectionError) {
+      message = 'Server is taking longer than usual. Please ry again .';
+    }
+
     if (data is Map) {
       final first = data.values.isNotEmpty ? data.values.first : null;
       if (first is List && first.isNotEmpty) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/auth_repository.dart';
@@ -38,9 +40,10 @@ class AuthNotifier extends AsyncNotifier<void> {
           _repo.register(email: email, fullName: fullName, password: password),
     );
     if (!state.hasError) {
-      await _requestPermissionsOnFirstLogin();
       await _resetSessionFlags();
       _invalidateSessionScopedProviders();
+      // Do not block navigation on first-run permission dialogs.
+      unawaited(_requestPermissionsOnFirstLogin());
     }
   }
 
@@ -50,9 +53,10 @@ class AuthNotifier extends AsyncNotifier<void> {
       () => _repo.login(email: email, password: password),
     );
     if (!state.hasError) {
-      await _requestPermissionsOnFirstLogin();
       await _resetSessionFlags();
       _invalidateSessionScopedProviders();
+      // Do not block navigation on first-run permission dialogs.
+      unawaited(_requestPermissionsOnFirstLogin());
     }
   }
 
