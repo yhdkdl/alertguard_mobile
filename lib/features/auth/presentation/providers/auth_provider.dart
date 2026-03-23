@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/auth_repository.dart';
+import '../../../../core/services/permission_service.dart';
 import '../../../contacts/presentation/providers/contact_provider.dart';
 import '../../../history/presentation/providers/history_provider.dart';
 import '../../../home/presentation/widgets/setup_checklist.dart';
@@ -17,6 +19,7 @@ final authStateProvider = FutureProvider<bool>((ref) async {
 });
 
 class AuthNotifier extends AsyncNotifier<void> {
+  static const _permissionsRequestedKey = 'permissions_requested_once';
   late AuthRepository _repo;
 
   @override
@@ -35,6 +38,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           _repo.register(email: email, fullName: fullName, password: password),
     );
     if (!state.hasError) {
+      await _requestPermissionsOnFirstLogin();
       await _resetSessionFlags();
       _invalidateSessionScopedProviders();
     }
@@ -46,6 +50,7 @@ class AuthNotifier extends AsyncNotifier<void> {
       () => _repo.login(email: email, password: password),
     );
     if (!state.hasError) {
+      await _requestPermissionsOnFirstLogin();
       await _resetSessionFlags();
       _invalidateSessionScopedProviders();
     }
@@ -64,6 +69,15 @@ class AuthNotifier extends AsyncNotifier<void> {
     // Prevent a previous account's safety mode from leaking into a new session.
     await ref.read(testModeProvider.notifier).setValue(false);
     ref.invalidate(testModeProvider);
+  }
+
+  Future<void> _requestPermissionsOnFirstLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyRequested = prefs.getBool(_permissionsRequestedKey) ?? false;
+    if (alreadyRequested) return;
+
+    await PermissionService.requestAllPermissions();
+    await prefs.setBool(_permissionsRequestedKey, true);
   }
 
   void _invalidateSessionScopedProviders() {

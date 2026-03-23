@@ -4,8 +4,10 @@ import '../storage/secure_storage.dart';
 class DioClient {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.6:8000/api/v1',
+    defaultValue: 'https://alertguard-api.onrender.com/api/v1',
   );
+  // for local development
+  // flutter run --dart-define=API_BASE_URL=http://192.168.1.6:8000/api/v1
 
   static const _defaultTimeout = Duration(seconds: 15);
   static const _uploadTimeout = Duration(seconds: 60);
