@@ -3,7 +3,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/storage/secure_storage.dart';
 
 class AuthRepository {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio = DioClient.authInstance;
 
   static const _loginRetryDelay = Duration(seconds: 2);
 

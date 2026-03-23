@@ -10,15 +10,22 @@ class DioClient {
   // flutter run --dart-define=API_BASE_URL=http://192.168.1.6:8000/api/v1
 
   static const _defaultTimeout = Duration(seconds: 15);
+  static const _authTimeout = Duration(seconds: 60);
   static const _uploadTimeout = Duration(seconds: 60);
 
   // Cached instances — created once, reused everywhere
   static Dio? _instance;
+  static Dio? _authInstance;
   static Dio? _uploadInstance;
 
   static Dio get instance {
     _instance ??= _createDio(receiveTimeout: _defaultTimeout);
     return _instance!;
+  }
+
+  static Dio get authInstance {
+    _authInstance ??= _createDio(receiveTimeout: _authTimeout);
+    return _authInstance!;
   }
 
   static Dio get uploadInstance {
@@ -38,6 +45,26 @@ class DioClient {
     );
     dio.interceptors.add(_AuthInterceptor());
     return dio;
+  }
+
+  static Future<void> warmUpBackend() async {
+    // Fire a lightweight request so sleeping backends can wake up early.
+    final warmupDio = Dio(
+      BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 20),
+      ),
+    );
+
+    try {
+      await warmupDio.get('/');
+    } on DioException {
+      // Any response (including 4xx/5xx) is enough for warm-up.
+    } catch (_) {
+      // Ignore non-network failures; warm-up is best-effort only.
+    }
   }
 }
 
@@ -125,7 +152,8 @@ class _AuthInterceptor extends Interceptor {
         err.type == DioExceptionType.sendTimeout ||
         err.type == DioExceptionType.receiveTimeout ||
         err.type == DioExceptionType.connectionError) {
-      message = 'Server is taking longer than usual. Please ry again .';
+      message =
+          'Server is taking longer than usual. Please wait a moment and try again.';
     }
 
     if (data is Map) {

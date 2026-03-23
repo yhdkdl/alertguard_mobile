@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/network/dio_client.dart';
 import 'core/router/app_router.dart';
 import 'core/services/background_service.dart';
 import 'core/services/queue_monitor.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Best-effort backend warm-up to reduce first-login cold starts.
+  unawaited(DioClient.warmUpBackend());
 
   // Start background service so triggers work when app is minimized.
   // Do not crash app startup if service init fails on a device/config.
