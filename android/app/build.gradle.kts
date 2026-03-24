@@ -5,6 +5,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 android {
     namespace = "com.example.alertguard_mobile"
     compileSdk = flutter.compileSdkVersion
@@ -14,10 +16,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -40,10 +38,34 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {
     source = "../.."
+}
+
+val renameReleaseApk by tasks.registering {
+    doLast {
+        val outputDir = file("$buildDir/outputs/flutter-apk")
+        val defaultApk = file("$outputDir/app-release.apk")
+        val targetApk = file("$outputDir/AlertGuard_v1.apk")
+
+        if (defaultApk.exists()) {
+            defaultApk.copyTo(targetApk, overwrite = true)
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "packageRelease") {
+        finalizedBy(renameReleaseApk)
+    }
 }
